@@ -25,12 +25,15 @@ jobs:
 
       - name: Install Cordova
         run: npm install -g cordova
-        
-      - name: install Cordova file plugin
-        run: cordova plugin add org.apache.cordova.file
-        
+                      
       - name: Prepare Cordova
         run: cordova platform add android
+        
+      - name: Cordova Build
+        run: cordova build
+      
+      - name: Install Cordova file plugin
+        run: cordova plugin add org.apache.cordova.file
 
       - name: Install yarn
         run: npm install -g yarn
