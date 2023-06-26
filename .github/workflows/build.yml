@@ -25,6 +25,9 @@ jobs:
 
       - name: Install Cordova
         run: npm install -g cordova
+        
+      - name: Prepare Cordova
+        run: cordova platform add android
 
       - name: Install yarn
         run: npm install -g yarn
