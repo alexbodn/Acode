@@ -30,7 +30,7 @@ jobs:
         run: cordova platform add android
       
       - name: Install Cordova file plugin
-        run: cordova plugin add org.apache.cordova.file
+        run: cordova plugin add cordova-plugin-file
         
       - name: Cordova Build
         run: cordova build
