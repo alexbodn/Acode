@@ -35,8 +35,8 @@ jobs:
       # - name: Configure the platform
       #   run: yarn clean
 
-      - name: Build Android dev apk
-        run: yarn build android paid dev
+     # - name: Build Android dev apk
+     #   run: yarn build android paid dev
 
       - name: Build Android prod aab
         run: yarn build android paid prod
