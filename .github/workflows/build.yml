@@ -58,10 +58,10 @@ jobs:
           key_alias: ${{ secrets.key_alias }}
           key_password: ${{ secrets.key_password }}
       
-      - name: Sign
-        run: |
-              sudo chmod 777 ./sign.sh
-              ./sign.sh
+     # - name: Sign
+     #   run: |
+     #         sudo chmod 777 ./sign.sh
+     #         ./sign.sh
 
       - name: Upload dev APK
         uses: actions/upload-artifact@v3
