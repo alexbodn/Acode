@@ -1,7 +1,8 @@
 import appSettings from 'lib/settings';
 import quickTools from 'components/quickTools';
-import createKeyboardEvent from 'utils/keyboardEvent';
+import KeyboardEvent from 'utils/keyboardEvent';
 import searchSettings from 'settings/searchSettings';
+import actionStack from 'lib/actionStack';
 
 /**@type {HTMLInputElement | HTMLTextAreaElement} */
 let input;
@@ -26,7 +27,7 @@ const events = {
  */
 
 quickTools.$input.addEventListener('input', (e) => {
-  const key = e.target.value;
+  const key = e.target.value.toUpperCase();
   quickTools.$input.value = '';
   if (!key || key.length > 1) return;
   const keyCombination = getKeys({ key });
@@ -37,7 +38,7 @@ quickTools.$input.addEventListener('input', (e) => {
     return;
   }
 
-  const event = createKeyboardEvent('keydown', keyCombination);
+  const event = KeyboardEvent('keydown', keyCombination);
   input = input || editorManager.editor.textInput.getElement();
 
   resetKeys();
@@ -51,7 +52,7 @@ quickTools.$input.addEventListener('keydown', (e) => {
   if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(keyCombination.key)) return;
   e.preventDefault();
 
-  const event = createKeyboardEvent('keydown', keyCombination);
+  const event = KeyboardEvent('keydown', keyCombination);
   input = input || editorManager.editor.textInput.getElement();
   input.dispatchEvent(event);
 });
@@ -133,7 +134,8 @@ export default function actions(action, value) {
       return true;
 
     case 'key': {
-      const event = createKeyboardEvent('keydown', getKeys({ keyCode: value }));
+      value = parseInt(value, 10);
+      const event = KeyboardEvent('keydown', getKeys({ keyCode: value }));
       if (value > 40 && value < 37) {
         resetKeys();
       }
@@ -403,7 +405,7 @@ function resetKeys() {
  * @param {string} [key.key] Key
  * @returns {KeyboardEventInit}
  */
-function getKeys(key = {}) {
+export function getKeys(key = {}) {
   return {
     ...key,
     shiftKey: state.shift,

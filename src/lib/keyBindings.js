@@ -1,4 +1,9 @@
 export default {
+  focusEditor: {
+    description: 'Focus editor',
+    key: 'Ctrl-1',
+    readOnly: false,
+  },
   copy: {
     description: 'Copy',
     key: 'Ctrl-C',
@@ -151,10 +156,12 @@ export default {
     readOnly: true,
   },
   fold: {
+    description: 'Fold',
     key: 'Alt-L|Ctrl-F1',
     readOnly: false,
   },
   unfold: {
+    description: 'Unfold',
     key: 'Alt-Shift-L|Ctrl-Shift-F1',
     readOnly: false,
   },

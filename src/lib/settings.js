@@ -131,12 +131,15 @@ class Settings {
       rtlText: false,
       hardWrap: false,
       useTextareaForIME: false,
-      touchMoveThreshold: Math.round((1 / devicePixelRatio) * 10) / 10,
+      touchMoveThreshold: Math.round((1 / devicePixelRatio) * 10) / 20,
       quicktoolsItems: [...Array(this.#QUICKTOOLS_SIZE).keys()],
       excludeFolders: this.#excludeFolders,
       maxFilesCount: 500,
       maxDirDepth: 10,
       maxDirCount: 100,
+      defaultFileEncoding: 'UTF-8',
+      inlineAutoCompletion: true,
+      colorPreview: true,
     };
     this.value = structuredClone(this.#defaultSettings);
   }
@@ -162,7 +165,7 @@ class Settings {
       return;
     }
 
-    const settings = helpers.parseJSON(await fs.readFile('utf-8'));
+    const settings = helpers.parseJSON(await fs.readFile('utf8'));
     if (settings) {
       // make sure that all the settings are present
       Object.keys(this.#defaultSettings).forEach((setting) => {

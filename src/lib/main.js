@@ -6,49 +6,53 @@ import 'styles/page.scss';
 import 'styles/list.scss';
 import 'styles/overrideAceStyle.scss';
 
-import 'ace/modelist';
-import 'ace/mode-smali';
-import 'components/WebComponents';
 import 'lib/polyfill';
+import 'ace/supportedModes';
+import 'components/WebComponents';
 
-import mustache from 'mustache';
-import ajax from '@deadlyjack/ajax';
-import tile from 'components/tile';
-import Sidebar from 'components/sidebar';
-import contextmenu from 'components/contextmenu';
-import EditorManager from './editorManager';
-import ActionStack from './actionStack';
-import helpers from 'utils/helpers';
-import settings from './settings';
-import constants from './constants';
-import intentHandler from 'handlers/intent';
-import openFolder, { addedFolder } from './openFolder';
-import quickToolsInit from 'handlers/quickToolsInit';
-import loadPolyFill from 'utils/polyfill';
 import Url from 'utils/Url';
-import applySettings from './applySettings';
+import lang from 'lib/lang';
+import Acode from 'lib/acode';
+import themes from 'lib/themes';
+import mustache from 'mustache';
+import startAd from 'lib/startAd';
+import tile from 'components/tile';
+import ajax from '@deadlyjack/ajax';
+import helpers from 'utils/helpers';
+import settings from 'lib/settings';
+import $_menu from 'views/menu.hbs';
+import openFile from 'lib/openFile';
+import plugins from 'pages/plugins';
 import fsOperation from 'fileSystem';
 import toast from 'components/toast';
-import $_menu from 'views/menu.hbs';
-import $_fileMenu from 'views/file-menu.hbs';
-import openFiles from './openFiles';
-import loadPlugins from './loadPlugins';
-import checkPluginsUpdate from './checkPluginsUpdate';
-import plugins from 'pages/plugins';
-import Acode from './acode';
-import lang from './lang';
-import EditorFile from './editorFile';
 import sidebarApps from 'sidebarApps';
-import checkFiles from './checkFiles';
-import themes from './themes';
-import { createEventInit } from 'utils/keyboardEvent';
-import { resetKeyBindings, setKeyBindings } from 'ace/commands';
-import { initFileList } from './fileList';
-import QuickTools from 'pages/quickTools/quickTools';
+import EditorFile from 'lib/editorFile';
+import openFolder from 'lib/openFolder';
+import checkFiles from 'lib/checkFiles';
+import Sidebar from 'components/sidebar';
+import actionStack from 'lib/actionStack';
+import loadPolyFill from 'utils/polyfill';
+import loadPlugins from 'lib/loadPlugins';
 import tutorial from 'components/tutorial';
-import openFile from './openFile';
-import startAd from './startAd';
+import intentHandler from 'handlers/intent';
+import restoreFiles from 'lib/restoreFiles';
+import $_fileMenu from 'views/file-menu.hbs';
+import EditorManager from 'lib/editorManager';
+import applySettings from 'lib/applySettings';
+import keyboardHandler from 'handlers/keyboard';
+import contextmenu from 'components/contextmenu';
 import otherSettings from 'settings/appSettings';
+import windowResize from 'handlers/windowResize';
+import quickToolsInit from 'handlers/quickToolsInit';
+import QuickTools from 'pages/quickTools/quickTools';
+import checkPluginsUpdate from 'lib/checkPluginsUpdate';
+
+import { initModes } from 'ace/modelist';
+import { initFileList } from 'lib/fileList';
+import { addedFolder } from 'lib/openFolder';
+import { keydownState } from 'handlers/keyboard';
+import { getEncoding, initEncodings } from 'utils/encodings';
+import { resetKeyBindings, setKeyBindings } from 'ace/commands';
 
 const previousVersionCode = parseInt(localStorage.versionCode, 10);
 
@@ -69,21 +73,17 @@ async function Main() {
     }
   };
 
-  window.addEventListener('resize', () => {
-    if (window.ad?.shown && (innerHeight * devicePixelRatio) < 600) {
-      ad.hide();
-      return;
-    }
-
-    if (window.ad?.shown) {
-      ad.show();
-    }
-  });
-
+  window.addEventListener('resize', windowResize);
+  document.addEventListener('pause', pauseHandler);
+  document.addEventListener('resume', resumeHandler);
+  document.addEventListener('keydown', keyboardHandler);
   document.addEventListener('deviceready', onDeviceReady);
+  document.addEventListener('backbutton', backButtonHandler);
+  document.addEventListener('menubutton', menuButtonHandler);
 }
 
 async function onDeviceReady() {
+  await initEncodings(); // important to load encodings before anything else
 
   const isFreePackage = /(free)$/.test(BuildInfo.packageName);
   const oldResolveURL = window.resolveLocalFileSystemURL;
@@ -222,7 +222,6 @@ async function loadApp() {
   const folders = helpers.parseJSON(localStorage.folders);
   const files = helpers.parseJSON(localStorage.files) || [];
   const editorManager = await EditorManager($header, $main);
-  const actionStack = new ActionStack();
 
   const setMainMenu = () => {
     if ($mainMenu) {
@@ -253,7 +252,7 @@ async function loadApp() {
   };
 
   acode.$headerToggler = $headerToggler;
-  window.actionStack = actionStack;
+  window.actionStack = actionStack.windowCopy();
   window.editorManager = editorManager;
   setMainMenu(settings.value.openFileListPos);
   setFileMenu(settings.value.openFileListPos);
@@ -270,8 +269,8 @@ async function loadApp() {
   //#endregion
 
   //#region Add event listeners
+  initModes();
   initFileList();
-  createEventInit();
   quickToolsInit();
   sidebarApps.init($sidebar);
   await sidebarApps.loadApps();
@@ -281,8 +280,6 @@ async function loadApp() {
   editorManager.on('rename-file', onFileUpdate);
   editorManager.on('switch-file', onFileUpdate);
   editorManager.on('file-loaded', onFileUpdate);
-  document.addEventListener('backbutton', actionStack.pop);
-  document.addEventListener('menubutton', $sidebar.toggle);
   navigator.app.overrideButton('menubutton', true);
   system.setIntentHandler(intentHandler, intentHandler.onError);
   system.getCordovaIntent(intentHandler, intentHandler.onError);
@@ -301,13 +298,6 @@ async function loadApp() {
     const activeFile = editorManager.activeFile;
     if (activeFile) editorManager.editor.blur();
   };
-  document.addEventListener('pause', () => {
-    acode.exec('save-state');
-  });
-  document.addEventListener('resume', () => {
-    if (!settings.value.checkFiles) return;
-    checkFiles();
-  });
   sdcard.watchFile(KEYBINDING_FILE, async () => {
     await setKeyBindings(editorManager.editor);
     toast(strings['key bindings updated']);
@@ -349,7 +339,7 @@ async function loadApp() {
   }
 
   if (Array.isArray(files) && files.length) {
-    openFiles(files)
+    restoreFiles(files)
       .then(() => {
         onEditorUpdate(undefined, false);
       })
@@ -464,7 +454,7 @@ function createFileMenu({ top, bottom, toggler }) {
     toggler,
     transformOrigin: top ? 'top right' : 'bottom right',
     innerHTML: () => {
-      const file = editorManager.activeFile;
+      const file = window.editorManager.activeFile;
 
       if (file.loading) {
         $menu.classList.add('disabled');
@@ -472,15 +462,16 @@ function createFileMenu({ top, bottom, toggler }) {
         $menu.classList.remove('disabled');
       }
 
+      const { label: encoding } = getEncoding(file.encoding);
+
       return mustache.render($_fileMenu, {
         ...strings,
         file_mode: (file.session.getMode().$id || '').split('/').pop(),
-        file_encoding: file.encoding,
+        file_encoding: encoding,
         file_read_only: !file.editable,
-        file_info: !!file.uri,
+        file_on_disk: !!file.uri,
         file_eol: file.eol,
-        copy_text: !!editorManager.editor.getCopyText(),
-        new_file: file.name === constants.DEFAULT_FILE_NAME && !file.session.getValue(),
+        copy_text: !!window.editorManager.editor.getCopyText(),
       });
     },
   });
@@ -489,18 +480,6 @@ function createFileMenu({ top, bottom, toggler }) {
 }
 
 function showTutorials() {
-  tutorial('main-tutorials', (hide) => {
-    const onclick = () => {
-      QuickTools();
-      hide();
-    };
-
-    return <p>
-      Command palette icon has been removed from shortcuts, but you can modify shortcuts.
-      <span className='link' onclick={onclick}>Click here</span> to configure quick tools.
-    </p>;
-  });
-
   if (window.innerWidth > 750) {
     tutorial('quicktools-tutorials', (hide) => {
       const onclick = () => {
@@ -514,23 +493,27 @@ function showTutorials() {
       </p>;
     });
   }
+}
 
-  if (previousVersionCode < 284) {
-    tutorial('keybinding-tutorials', (hide) => {
-      const reset = () => {
-        resetKeyBindings();
-        hide();
-      };
-
-      const edit = () => {
-        openFile(KEYBINDING_FILE);
-        hide();
-      };
-
-      return <p>
-        Keybinding file is misconfigured. Please <span className='link' onclick={edit}>edit</span> or <span className='link' onclick={reset}>reset</span> it.
-        There was a typo in keybinding file. Search 'pallete' and replace it with 'palette'.
-      </p>;
-    });
+function backButtonHandler() {
+  if (keydownState.esc) {
+    keydownState.esc = false;
+    return;
   }
+  actionStack.pop();
+}
+
+function menuButtonHandler() {
+  const { acode } = window;
+  acode?.exec('toggle-sidebar');
+}
+
+function pauseHandler() {
+  const { acode } = window;
+  acode?.exec('save-state');
+}
+
+function resumeHandler() {
+  if (!settings.value.checkFiles) return;
+  checkFiles();
 }

@@ -1,9 +1,10 @@
-import Irid from 'irid';
+import Color from 'utils/color';
 
 export default class ThemeBuilder {
   #theme = {
     "--popup-border-radius": "4px",
     "--active-color": "rgb(51, 153, 255)",
+    "--active-text-color": "rgb(255, 215, 0)",
     "--active-icon-color": "rgba(0, 0, 0, 0.2)",
     "--border-color": "rgba(122, 122, 122, 0.2)",
     "--box-shadow-color": "rgba(0, 0, 0, 0.2)",
@@ -22,6 +23,7 @@ export default class ThemeBuilder {
     "--popup-background-color": "rgb(255, 255, 255)",
     "--popup-text-color": "rgb(37, 37, 37)",
     "--popup-active-color": "rgb(169, 0, 0)",
+    "--file-tab-width": "120px",
   };
 
   version = 'free';
@@ -39,7 +41,7 @@ export default class ThemeBuilder {
    * @param {'dark'|'light'} [type] type of the theme 
    * @param {'free'|'paid'} [version]  version of the theme
    */
-  constructor(name = '', type = 'dark', version = 'paid') {
+  constructor(name = '', type = 'dark', version = 'free') {
     this.name = name;
     this.type = type;
     this.version = version;
@@ -127,7 +129,7 @@ export default class ThemeBuilder {
 
   set primaryColor(value) {
     if (this.autoDarkened) {
-      this.darkenedPrimaryColor = Irid(value).darken(0.4).toHexString();
+      this.darkenedPrimaryColor = Color(value).darken(0.4).hex.toString();
     }
     this.#theme['--primary-color'] = value;
   }
@@ -212,6 +214,22 @@ export default class ThemeBuilder {
     this.#theme['--popup-active-color'] = value;
   }
 
+  get fileTabWidth() {
+    return this.#theme['--file-tab-width'];
+  }
+
+  set fileTabWidth(value) {
+    this.#theme['--file-tab-width'] = value;
+  }
+
+  get activeTextColor() {
+    return this.#theme['--active-text-color'];
+  }
+
+  set activeTextColor(value) {
+    this.#theme['--active-text-color'] = value;
+  }
+
   get css() {
     let css = '';
     Object.keys(this.#theme).forEach(key => {
@@ -240,8 +258,7 @@ export default class ThemeBuilder {
    * This method is used to set a darkened primary color.
    */
   darkenPrimaryColor() {
-    const hex = Irid(this.primaryColor).toHexString();
-    this.darkenedPrimaryColor = Irid(hex).darken(0.4).toHexString();
+    this.darkenedPrimaryColor = Color(this.primaryColor).darken(0.4).hex.toString();
   }
 
   /**
@@ -296,7 +313,7 @@ export default class ThemeBuilder {
   }
 }
 
-export function createBuiltInTHeme(name, type, version = 'paid') {
+export function createBuiltInTheme(name, type, version = 'paid') {
   const theme = new ThemeBuilder(name, type, version);
   theme.autoDarkened = false;
   return theme;

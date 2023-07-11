@@ -1,14 +1,15 @@
 import './style.scss';
 
+
 /**
  * @typedef {Object} HintObj
  * @property {string} value
  * @property {string} text
- */
+*/
 
 /**
  * @typedef {HintObj|string} Hint
- */
+*/
 
 /**
  * @typedef {Object} HintModification
@@ -19,7 +20,7 @@ import './style.scss';
 
 /**
  * @typedef {(setHints:(hints:Array<Hint>)=>void, modification: HintModification) => void} HintCallback
- */
+*/
 
 
 /**
@@ -28,23 +29,35 @@ import './style.scss';
  * @param {Array<Hint>|HintCallback} hints Hints or a callback to generate hints
  * @param {(value: string) => void} onSelect Callback to call when a hint is selected
  * @returns {{getSelected: ()=>HTMLLIElement, container: HTMLUListElement}}
- */
-
+*/
 export default function inputhints($input, hints, onSelect) {
   /**@type {HTMLUListElement} */
-  let $ul = <Ul />;
+  const $ul = <Ul />;
+
+  let preventUpdate = false;
+  let updateUlTimeout;
+
   $input.addEventListener('focus', onfocus);
 
   if (typeof hints === 'function') {
     const cb = hints;
     hints = [];
-    updateUl(<Ul hints={[{
-      text: strings['loading...'],
-      value: '',
-    }]} />);
+    $ul.content = [<Hint hint={{ value: '', text: strings['loading...'] }} />];
     cb(setHints, hintModification());
   } else {
     setHints(hints);
+  }
+
+  /**
+   * Retain the focus on the input field 
+   */
+  function handleMouseDown() {
+    preventUpdate = true;
+  }
+
+  function handleMouseUp() {
+    $input.focus();
+    preventUpdate = false;
   }
 
   /**
@@ -52,9 +65,6 @@ export default function inputhints($input, hints, onSelect) {
    * @param {MouseEvent} e Event
    */
   function handleClick(e) {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    e.stopPropagation();
     const $el = e.target;
     const action = $el.getAttribute('action');
     if (action !== 'hint') return;
@@ -62,11 +72,8 @@ export default function inputhints($input, hints, onSelect) {
     if (!value) return;
     $input.value = $el.textContent;
     if (onSelect) onSelect(value);
-    else $input.dataset.value = value;
-    const activeHint = $ul.get('.active');
-    if (!activeHint) return;
-    activeHint.classList.remove('active');
-    $el.classList.add('active');
+    preventUpdate = false;
+    onblur();
   }
 
   /**
@@ -74,15 +81,15 @@ export default function inputhints($input, hints, onSelect) {
    * @param {KeyboardEvent} e Event
    */
   function handleKeypress(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      e.stopPropagation();
-      const activeHint = $ul.get('.active');
-      if (!activeHint) return;
-      const value = activeHint.getAttribute('value');
-      if (onSelect) onSelect(value);
-      else $input.value = value;
-    }
+    if (e.key !== 'Enter') return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    const activeHint = $ul.get('.active');
+    if (!activeHint) return;
+    const value = activeHint.getAttribute('value');
+    if (onSelect) onSelect(value);
+    else $input.value = value;
   }
 
   /**
@@ -95,14 +102,14 @@ export default function inputhints($input, hints, onSelect) {
       e.preventDefault();
       e.stopPropagation();
     }
-    moveDown(code);
+    updateHintFocus(code);
   }
 
   /**
    * Moves the active hint up or down
    * @param {"ArrowDown" | "ArrowUp"} key Direction to move
    */
-  function moveDown(key) {
+  function updateHintFocus(key) {
     let nextHint;
     let activeHint = $ul.get('.active');
     if (!activeHint) activeHint = $ul.firstChild;
@@ -138,10 +145,12 @@ export default function inputhints($input, hints, onSelect) {
         matched.push(hint);
       }
     });
-    updateUl(<Ul hints={matched} />);
+    updateUl(matched);
   }
 
   function onfocus() {
+    if (preventUpdate) return;
+
     $input.addEventListener('keypress', handleKeypress);
     $input.addEventListener('keydown', handleKeydown);
     $input.addEventListener('blur', onblur);
@@ -152,13 +161,21 @@ export default function inputhints($input, hints, onSelect) {
     position();
   }
 
+  /**
+   * Event listener for blur
+   * @returns 
+   */
   function onblur() {
-    removeUl();
+    if (preventUpdate) return;
+
+    clearTimeout(updateUlTimeout);
     $input.removeEventListener('keypress', handleKeypress);
     $input.removeEventListener('keydown', handleKeydown);
     $input.removeEventListener('blur', onblur);
     $input.removeEventListener('input', oninput);
     window.removeEventListener('resize', position);
+    ulRemoveEventListeners();
+    $ul.remove();
   }
 
   /**
@@ -200,7 +217,7 @@ export default function inputhints($input, hints, onSelect) {
     } else {
       hints = [];
     }
-    updateUl(<Ul hints={hints} />);
+    updateUl(hints);
     $ul.classList.remove('loading');
   }
 
@@ -230,44 +247,78 @@ export default function inputhints($input, hints, onSelect) {
     };
   }
 
-  function removeUl($el = $ul) {
-    ulRemoveEventListeners($el);
-    $el.remove();
-    $el = null;
+  function ulAddEventListeners() {
+    window.addEventListener('resize', position);
+    $ul.addEventListener('click', handleClick);
+    $ul.addEventListener('mousedown', handleMouseDown);
+    $ul.addEventListener('mouseup', handleMouseUp);
+    $ul.addEventListener('touchstart', handleMouseDown);
+    $ul.addEventListener('touchend', handleMouseUp);
   }
 
-  function ulAddEventListeners($el = $ul) {
-    $el.addEventListener('mousedown', handleClick);
+  function ulRemoveEventListeners() {
+    window.removeEventListener('resize', position);
+    $ul.removeEventListener('click', handleClick);
+    $ul.removeEventListener('mousedown', handleMouseDown);
+    $ul.removeEventListener('mouseup', handleMouseUp);
+    $ul.removeEventListener('touchstart', handleMouseDown);
+    $ul.removeEventListener('touchend', handleMouseUp);
   }
 
-  function ulRemoveEventListeners($el = $ul) {
-    $el.removeEventListener('mousedown', handleClick);
+  /**
+   * First time updates the hint instantly, then debounce
+   * @param {Array<HintObj>} hints 
+   */
+  function updateUl(hints) {
+    updateUlNow(hints);
+    updateUl = updateUlDebounce;
   }
 
-  function updateUl($newUl) {
-    let $oldUl = $ul;
-    $ul = $newUl;
+  /**
+   * Update the hint list after a delay
+   * @param {Array<HintObj>} hints 
+   */
+  function updateUlDebounce(hints) {
+    clearTimeout(updateUlTimeout);
+    updateUlTimeout = setTimeout(updateUlNow, 300, hints);
+  }
 
-    removeUl($oldUl);
-    $oldUl = null;
-    $input.blur();
-    $input.focus();
+  /**
+   * Update the hint list instantly
+   * @param {Array<HintObj>} hints 
+   */
+  function updateUlNow(hints) {
+    $ul.remove();
+    $ul.innerHTML = '';
+    $ul.content = hints.map((hint) => <Hint hint={hint} />);
+    app.append($ul);
+    position(); // Update the position of the new list
   }
 
   return {
-    getSelected: () => $ul.get('.active'),
-    container: $ul,
+    getSelected() { $ul.get('.active'); },
+    get container() { return $ul; },
   };
 }
 
 /**
  * Create a hint item
  * @param {object} param0 Hint item
- * @param {string} param0.value Hint value
- * @param {string} param0.text Hint text
+ * @param {HintObj} param0.hint Hint item
  * @returns {HTMLLIElement}
  */
-function Hint({ value, text }) {
+function Hint({ hint }) {
+  let value = '';
+  let text = '';
+
+  if (typeof hint === 'string') {
+    value = hint;
+    text = hint;
+  } else {
+    value = hint.value;
+    text = hint.text;
+  }
+
   return <li attr-action='hint' attr-value={value} innerHTML={text}></li>;
 }
 
@@ -279,11 +330,6 @@ function Hint({ value, text }) {
  */
 function Ul({ hints = [] }) {
   return <ul id='hints' className='scroll'>
-    {hints.map((hint) => {
-      if (typeof hint === 'string') {
-        return <Hint value={hint} text={hint} />;
-      }
-      return <Hint {...hint} />;
-    })}
+    {hints.map((hint) => <Hint hint={hint} />)}
   </ul>;
 }

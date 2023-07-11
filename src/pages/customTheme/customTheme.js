@@ -1,13 +1,15 @@
 import './customTheme.scss';
 
-import Page from '../../components/page';
-import color from '../../components/dialogs/color';
-import helpers from '../../utils/helpers';
-import select from '../../components/dialogs/select';
-import dialogs from '../../components/dialogs';
-import settings from '../../lib/settings';
-import themes from '../../lib/themes';
-import ThemeBuilder from '../../lib/themeBuilder';
+import Page from 'components/page';
+import color from 'dialogs/color';
+import helpers from 'utils/helpers';
+import select from 'dialogs/select';
+import settings from 'lib/settings';
+import themes from 'lib/themes';
+import ThemeBuilder from 'lib/themeBuilder';
+import confirm from 'dialogs/confirm';
+import actionStack from 'lib/actionStack';
+import { isValidColor } from 'utils/color/regex';
 
 export default function CustomThemeInclude() {
   const theme = themes.get('custom');
@@ -54,7 +56,7 @@ export default function CustomThemeInclude() {
       }
 
       if (action === 'reset-theme') {
-        const confirmation = await dialogs.confirm(strings['info'].toUpperCase(), strings['reset warning']);
+        const confirmation = await confirm(strings['info'].toUpperCase(), strings['reset warning']);
         if (!confirmation) return;
         settings.reset('customTheme');
         themes.update(ThemeBuilder.fromJSON(settings.value.customTheme));
@@ -77,7 +79,7 @@ export default function CustomThemeInclude() {
     $page.body = <div id='custom-theme' className='main'>
       <div className='list scroll'>{
         Object.keys(customTheme.toJSON())
-          .filter((key) => helpers.isValidColor(customTheme[key]))
+          .filter((key) => isValidColor(customTheme[key]))
           .map(
             (key) => <div
               className='list-item'

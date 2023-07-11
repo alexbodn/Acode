@@ -1,18 +1,15 @@
 {
   "name": "com.foxdebug.acode",
   "displayName": "Acode",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "description": "Acode is a code editor for android",
   "main": "index.js",
   "scripts": {
     "lang": "node ./utils/lang.js",
     "build": "sh utils/scripts/build.sh",
     "start": "sh utils/scripts/start.sh",
-    "start:debug": "sh utils/scripts/start.sh",
     "clean": "sh utils/scripts/clean.sh android android@10",
     "plugin": "sh utils/scripts/plugin.sh",
-    "test": "jest",
-    "build-ace": "node ./utils/build-ace.js",
     "setup": "sh utils/scripts/setup.sh"
   },
   "keywords": [
@@ -29,12 +26,12 @@
       "cordova-plugin-file": {
         "ANDROIDX_WEBKIT_VERSION": "1.4.0"
       },
-      "cordova-plugin-system": {},
       "cordova-plugin-sftp": {},
-      "cordova-plugin-iap": {},
       "cordova-plugin-server": {},
       "cordova-plugin-ftp": {},
-      "cordova-plugin-sdcard": {}
+      "cordova-plugin-sdcard": {},
+      "cordova-plugin-iap": {},
+      "cordova-plugin-system": {}
     },
     "platforms": [
       "android"
@@ -94,8 +91,7 @@
     "escape-string-regexp": "^5.0.0",
     "esprima": "^4.0.1",
     "filesize": "^10.0.7",
-    "html-tag-js": "^1.1.40",
-    "irid": "^4.0.0",
+    "html-tag-js": "^1.1.41",
     "js-base64": "^3.7.4",
     "jszip": "^3.10.1",
     "marked": "^5.0.3",
@@ -103,7 +99,6 @@
     "minimatch": "^9.0.1",
     "mustache": "^4.2.0",
     "url-parse": "^1.5.10",
-    "utf8": "^3.0.0",
     "vanilla-picker": "^2.11.2",
     "yargs": "^17.7.2"
   },

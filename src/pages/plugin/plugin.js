@@ -1,17 +1,18 @@
 import './plugin.scss';
-import view from './plugin.view.js';
-import Page from "../../components/page";
-import helpers from '../../utils/helpers';
+import Url from 'utils/Url';
 import { marked } from 'marked';
-import Url from '../../utils/Url';
-import installPlugin from '../../lib/installPlugin';
-import fsOperation from '../../fileSystem';
-import settingsPage from '../../components/settingsPage';
-import constants from '../../lib/constants';
-import purchaseListener from '../../handlers/purchase';
 import ajax from '@deadlyjack/ajax';
-import alert from '../../components/dialogs/alert';
-import loader from 'components/dialogs/loader';
+import view from './plugin.view.js';
+import Page from "components/page";
+import helpers from 'utils/helpers';
+import fsOperation from 'fileSystem';
+import constants from 'lib/constants';
+import installPlugin from 'lib/installPlugin';
+import settingsPage from 'components/settingsPage';
+import purchaseListener from 'handlers/purchase';
+import alert from 'dialogs/alert';
+import loader from 'dialogs/loader';
+import actionStack from 'lib/actionStack';
 
 export default async function PluginInclude(id, installed, onInstall, onUninstall) {
   installed = typeof installed !== 'boolean' ? installed === 'true' : installed;
@@ -26,6 +27,7 @@ export default async function PluginInclude(id, installed, onInstall, onUninstal
   let product;
   let purchaseToken;
   let $settingsIcon;
+  let minVersionCode = -1;
 
   actionStack.push({
     id: 'plugin',
@@ -47,7 +49,7 @@ export default async function PluginInclude(id, installed, onInstall, onUninstal
     if (installed) {
       const installedPlugin = await fsOperation(Url.join(PLUGIN_DIR, id, 'plugin.json')).readFile('json');
       const { author } = installedPlugin;
-      const description = await fsOperation(Url.join(PLUGIN_DIR, id, 'readme.md')).readFile('utf-8');
+      const description = await fsOperation(Url.join(PLUGIN_DIR, id, 'readme.md')).readFile('utf8');
       const iconUrl = await helpers.toInternalUri(Url.join(PLUGIN_DIR, id, 'icon.png'));
       const iconData = await fsOperation(iconUrl).readFile();
       const icon = URL.createObjectURL(new Blob([iconData], { type: 'image/png' }));
@@ -67,8 +69,8 @@ export default async function PluginInclude(id, installed, onInstall, onUninstal
 
     await (async () => {
       try {
+        loader.showTitleLoader();
         if (await helpers.checkAPIStatus() && (isValidSource(plugin.source))) {
-          loader.showTitleLoader();
           const remotePlugin = await fsOperation(constants.API_BASE, `plugin/${id}`)
             .readFile('json')
             .catch(() => null);
@@ -78,6 +80,10 @@ export default async function PluginInclude(id, installed, onInstall, onUninstal
           if (installed && remotePlugin?.version !== plugin.version) {
             currentVersion = plugin.version;
             update = true;
+          }
+
+          if (remotePlugin.min_version_code) {
+            minVersionCode = remotePlugin.min_version_code;
           }
 
           plugin = Object.assign({}, remotePlugin);
@@ -110,7 +116,6 @@ export default async function PluginInclude(id, installed, onInstall, onUninstal
   } catch (err) {
     helpers.error(err);
   } finally {
-    helpers.hideAd();
     loader.removeTitleLoader();
   }
 
@@ -244,6 +249,7 @@ export default async function PluginInclude(id, installed, onInstall, onUninstal
       install,
       uninstall,
       currentVersion,
+      minVersionCode,
     });
 
     if ($settingsIcon) {

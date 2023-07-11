@@ -6,8 +6,12 @@ import files, { Tree } from 'lib/fileList';
 import fsOperation from 'fileSystem';
 import openFile from 'lib/openFile';
 import addTouchListeners from 'ace/touchHandler';
-import defineMode from './searchResultMode';
-import Sidebar, { preventSlide } from 'components/sidebar';
+import settings from 'lib/settings';
+import helpers from 'utils/helpers';
+import escapeStringRegexp from 'escape-string-regexp';
+import Sidebar from 'components/sidebar';
+import { preventSlide } from 'components/sidebar';
+import { words, fileNames } from './searchResultMode';
 
 const workers = [];
 const results = [];
@@ -77,7 +81,7 @@ const store = {
   },
 };
 
-const debounceSearch = debounce(searchAll, 500);
+const debounceSearch = helpers.debounce(searchAll, 500);
 
 let useIncludeAndExclude = false;
 /**@type {AceAjax.Editor} */
@@ -105,7 +109,9 @@ $container.onref = ($el) => {
     useWorker: false,
     showLineNumbers: false,
     fontSize: '14px',
+    mode: 'ace/mode/search_result',
   });
+  searchResult.focus = () => { };
   $container.style.lineHeight = '1.5';
   searchResult.session.setTabSize(1);
   searchResult.renderer.setMargin(0, 0, -20, 0);
@@ -185,7 +191,7 @@ async function onWorkerMessage(e) {
         content = editorFile.session.getValue();
       } else {
         try {
-          content = await fsOperation(data).readFile('utf-8');
+          content = await fsOperation(data).readFile(settings.value.defaultFileEncoding);
         } catch (er) {
           readError = er;
         }
@@ -221,14 +227,24 @@ async function onWorkerMessage(e) {
         position: null,
       });
 
+      fileNames.push(file.name);
+      forceTokenizer();
       for (let i = 0; i < matches.length; i++) {
         const result = matches[i];
         result.file = index;
         results.push(result);
+        if (!words.includes(result.renderText)) {
+          words.push(result.renderText);
+          forceTokenizer();
+        }
       }
 
       searchResult.navigateFileEnd();
-      searchResult.insert(text);
+      if (fileNames.length > 1) {
+        searchResult.insert(`\n${text}`);
+      } else {
+        searchResult.insert(text);
+      }
       break;
     }
 
@@ -252,6 +268,7 @@ async function onWorkerMessage(e) {
       if (IS_FREE_VERSION && await window.iad?.isLoaded()) {
         window.iad.show();
       }
+
       terminateWorker(false);
       replacing = false;
       break;
@@ -275,6 +292,7 @@ async function onWorkerMessage(e) {
           { row: 0, column: 0 },
         );
       }
+
       searching = false;
       terminateWorker(false);
       break;
@@ -354,6 +372,13 @@ async function searchAll() {
   addEvents();
 
   const allFiles = files();
+  editorManager.files.forEach(file => {
+    const exists = allFiles.find(f => f.url === file.uri);
+    if (exists) return;
+
+    allFiles.push(new Tree(file.name, file.uri, false));
+  });
+
   if (!allFiles.length) {
     searchResult.removeGhostText();
     $progress.value = 100;
@@ -361,7 +386,8 @@ async function searchAll() {
   }
 
   searching = true;
-  setMode(); // set mode removes ghost text
+  words.length = 0;
+  fileNames.length = 0;
   searchResult.setGhostText(strings['searching...'], { row: 0, column: 0 });
   sendMessage('search-files', allFiles, regex, options);
 }
@@ -489,31 +515,6 @@ function getOptions() {
 }
 
 /**
- * Creates a debounced function that delays invoking the input function until after 'wait' milliseconds have elapsed 
- * since the last time the debounced function was invoked. Useful for implementing behavior that should only happen 
- * after the input is complete.
- *
- * @param {Function} func - The function to debounce.
- * @param {number} wait - The number of milliseconds to delay.
- * @returns {Function} The new debounced function.
- * @example
- * 
- * // Avoid costly calculations while the window size is in flux.
- * window.addEventListener('resize', debounce(myFunction, 200));
- */
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
-/**
  * Binds an event listener to the 'onref' method of the specified element reference.
  *
  * @param {Ref} $ref - The element reference containing the 'onref' method.
@@ -624,23 +625,17 @@ function Textarea({ name, placeholder, ref }) {
  * @param {boolean} [options.caseSensitive=false] - Whether the search is case-sensitive.
  * @param {boolean} [options.wholeWord=false] - Whether to match whole words only.
  * @param {boolean} [options.regExp=false] - Whether the search string is a regular expression.
- * @param {boolean} [lookBehind] - Whether to match the search string at the beginning of the line.
  * @returns {RegExp} - The regular expression created from the search string and options.
  */
-function toRegex(search, options, lookBehind = false) {
+function toRegex(search, options) {
   const { caseSensitive = false, wholeWord = false, regExp = false } = options;
 
   let flags = caseSensitive ? 'gm' : 'gim';
-  let regexString = regExp ? search : search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let regexString = regExp ? search : escapeStringRegexp(search);
 
   if (wholeWord) {
     const wordBoundary = '\\b';
     regexString = `${wordBoundary}${regexString}${wordBoundary}`;
-  }
-
-  if (lookBehind) {
-    regexString = `(?:${regexString})`;
-    flags = '';
   }
 
   try {
@@ -654,21 +649,6 @@ function toRegex(search, options, lookBehind = false) {
 }
 
 /**
- * Sets highlight mode for search result 
- */
-function setMode() {
-  const MODE = `ace/mode/search_result`;
-  const { session } = searchResult;
-
-  const options = getOptions();
-  const regex = toRegex($search.value, options, true);
-  session.$modes[MODE] = null;
-  defineMode(regex, options.caseSensitive);
-  session.setMode('ace/mode/text');
-  session.setMode(MODE);
-}
-
-/**
  * On cursor change event handler
  */
 async function onCursorChange() {
@@ -676,17 +656,19 @@ async function onCursorChange() {
   const result = results[line];
   if (!result) return;
   const { file, position } = result;
-  const { url } = filesSearched[file];
+  if (!position) { // fold the file
+    searchResult.execCommand('toggleFoldWidget');
+    return;
+  }
 
   Sidebar.hide();
+  const { url } = filesSearched[file];
   await openFile(url, { render: true });
-
-  if (position) {
-    const { editor } = editorManager;
-    editor.moveCursorTo(position.start.row, position.start.column, false);
-    editor.selection.setRange(position);
-    editor.centerSelection();
-  }
+  const { editor } = editorManager;
+  editor.moveCursorTo(position.start.row, position.start.column, false);
+  editor.selection.setRange(position);
+  editor.centerSelection();
+  editor.focus();
 }
 
 /**
@@ -722,4 +704,14 @@ function removeEvents() {
   files.off('refresh', onInput);
   editorManager.off('rename-file', onInput);
   editorManager.off('file-content-changed', onInput);
+}
+
+function forceTokenizer() {
+  const { session } = searchResult;
+  // force recreation of tokenizer
+  session.$mode.$tokenizer = null;
+  session.bgTokenizer.setTokenizer(session.$mode.getTokenizer());
+  // force re-highlight whole document
+  const row = session.getLength() - 1;
+  session.bgTokenizer.start(row);
 }

@@ -1,26 +1,43 @@
-import appSettings from "./settings";
-import commands from "./commands";
-import fsOperation from "../fileSystem";
 import Url from "utils/Url";
-import EditorFile from "./editorFile";
-import defaultFormatter from "settings/defaultFormatter";
-import dialogs from "components/dialogs";
-import FileBrowser from "pages/fileBrowser";
-import helpers from "utils/helpers";
-import projects from "./projects";
-import selectionMenu from "./selectionMenu";
+import fonts from 'lib/fonts';
+import box from 'dialogs/box';
+import Color from 'utils/color';
+import themes from 'lib/themes';
+import files from 'lib/fileList';
+import alert from 'dialogs/alert';
 import Page from 'components/page';
-import inputhints from 'components/inputhints';
-import palette from 'components/palette';
-import openFolder, { addedFolder } from './openFolder';
-import fonts from './fonts';
-import themes from './themes';
-import ThemeBuilder from './themeBuilder';
-import sidebarApps from 'sidebarApps';
-import files from './fileList';
-import contextmenu from 'components/contextmenu';
+import commands from "lib/commands";
+import helpers from "utils/helpers";
+import projects from "lib/projects";
+import prompt from 'dialogs/prompt';
+import select from 'dialogs/select';
+import loader from 'dialogs/loader';
+import fsOperation from "fileSystem";
 import toast from 'components/toast';
+import sidebarApps from 'sidebarApps';
+import confirm from 'dialogs/confirm';
+import appSettings from "lib/settings";
+import colorPicker from 'dialogs/color';
+import EditorFile from "lib/editorFile";
+import openFolder from 'lib/openFolder';
+import encodings from 'utils/encodings';
+import palette from 'components/palette';
+import actionStack from 'lib/actionStack';
 import tutorial from 'components/tutorial';
+import FileBrowser from "pages/fileBrowser";
+import ThemeBuilder from 'lib/themeBuilder';
+import selectionMenu from "lib/selectionMenu";
+import multiPrompt from 'dialogs/multiPrompt';
+import inputhints from 'components/inputhints';
+import KeyboardEvent from 'utils/keyboardEvent';
+import keyboardHandler from 'handlers/keyboard';
+import windowResize from 'handlers/windowResize';
+import contextmenu from 'components/contextmenu';
+import defaultFormatter from "settings/formatter";
+
+import { addedFolder } from 'lib/openFolder';
+import { decode, encode } from 'utils/encodings';
+import { addMode, removeMode } from 'ace/modelist';
 
 export default class Acode {
   #modules = {};
@@ -40,48 +57,72 @@ export default class Acode {
   }];
 
   constructor() {
-    this.define('Url', Url);
-    this.define('fs', fsOperation);
-    this.define('projects', projects);
-    this.define('alert', dialogs.alert);
-    this.define('prompt', dialogs.prompt);
-    this.define('select', dialogs.select);
-    this.define('loader', dialogs.loader);
-    this.define('dialogBox', dialogs.box);
-    this.define('addedfolder', addedFolder);
-    this.define('colorPicker', dialogs.color);
-    this.define('contextMenu', contextmenu);
-    this.define('fileBrowser', FileBrowser);
-    this.define('confirm', dialogs.confirm);
-    this.define('selectionMenu', selectionMenu);
-    this.define('multiPrompt', dialogs.multiPrompt);
-    this.define('toInternalUrl', helpers.toInternalUri);
-    this.define('EditorFile', EditorFile);
-    this.define('page', Page);
-    this.define('settings', appSettings);
-    this.define('helpers', helpers);
-    this.define('inputhints', inputhints);
-    this.define('palette', palette);
-    this.define('fsOperation', fsOperation);
-    this.define('openfolder', openFolder);
-    this.define('fonts', fonts);
-    this.define('toast', toast);
-    this.define('tutorial', tutorial);
-    this.define('themes', {
+    const encodingsModule = {
+      get encodings() {
+        return encodings;
+      },
+      encode,
+      decode,
+    };
+
+    const themesModule = {
       add: themes.add,
       get: themes.get,
       list: themes.list,
       update: themes.update,
       // Deprecated, not supported anymore
       apply: () => { },
-    });
-    this.define('themeBuilder', ThemeBuilder);
-    this.define('sidebarApps', {
+    };
+
+    const sidebarAppsModule = {
       add: sidebarApps.add,
       get: sidebarApps.get,
       remove: sidebarApps.remove,
-    });
+    };
+
+    const aceModes = {
+      addMode,
+      removeMode,
+    };
+
+    this.define('Url', Url);
+    this.define('page', Page);
+    this.define('Color', Color);
+    this.define('fonts', fonts);
+    this.define('toast', toast);
+    this.define('alert', alert);
+    this.define('select', select);
+    this.define('loader', loader);
+    this.define('dialogBox', box);
+    this.define('prompt', prompt);
     this.define('fileList', files);
+    this.define('fs', fsOperation);
+    this.define('confirm', confirm);
+    this.define('helpers', helpers);
+    this.define('palette', palette);
+    this.define('projects', projects);
+    this.define('tutorial', tutorial);
+    this.define('colorPicker', colorPicker);
+    this.define('aceModes', aceModes);
+    this.define('themes', themesModule);
+    this.define('settings', appSettings);
+    this.define('EditorFile', EditorFile);
+    this.define('inputhints', inputhints);
+    this.define('openfolder', openFolder);
+    this.define('actionStack', actionStack);
+    this.define('multiPrompt', multiPrompt);
+    this.define('addedfolder', addedFolder);
+    this.define('contextMenu', contextmenu);
+    this.define('fileBrowser', FileBrowser);
+    this.define('fsOperation', fsOperation);
+    this.define('keyboard', keyboardHandler);
+    this.define('windowResize', windowResize);
+    this.define('encodings', encodingsModule);
+    this.define('themeBuilder', ThemeBuilder);
+    this.define('selectionMenu', selectionMenu);
+    this.define('sidebarApps', sidebarAppsModule);
+    this.define('createKeyboardEvent', KeyboardEvent);
+    this.define('toInternalUrl', helpers.toInternalUri);
   }
 
   /**
@@ -174,15 +215,18 @@ export default class Acode {
     const { getModeForPath } = ace.require('ace/ext/modelist');
     const { name } = getModeForPath(file.filename);
     const formatterId = appSettings.value.formatter[name];
-    let formatter = this.#formatter.find(({ id }) => id === formatterId);
+    const formatter = this.#formatter.find(({ id }) => id === formatterId);
+
+    await formatter?.format();
 
     if (!formatter && selectIfNull) {
-      defaultFormatter(name);
+      return defaultFormatter(name, (id) => {
+        const formatter = this.#formatter.find(({ id: _id }) => _id === id);
+        formatter?.format();
+      });
     } else if (!formatter && !selectIfNull) {
       toast(strings['please select a formatter']);
     }
-
-    if (formatter) await formatter.format();
   }
 
   fsOperation(file) {
@@ -218,11 +262,11 @@ export default class Acode {
   }
 
   alert(title, message, onhide) {
-    dialogs.alert(title, message, onhide);
+    alert(title, message, onhide);
   }
 
   loader(title, message, cancel) {
-    return dialogs.loader.create(title, message, cancel);
+    return loader.create(title, message, cancel);
   }
 
   joinUrl(...args) {
@@ -238,22 +282,22 @@ export default class Acode {
   }
 
   async prompt(message, defaultValue, type, options) {
-    const response = await dialogs.prompt(message, defaultValue, type, options);
+    const response = await prompt(message, defaultValue, type, options);
     return response;
   }
 
   async confirm(title, message) {
-    const confirmation = await dialogs.confirm(title, message);
+    const confirmation = await confirm(title, message);
     return confirmation;
   }
 
   async select(title, options, config) {
-    const response = await dialogs.select(title, options, config);
+    const response = await select(title, options, config);
     return response;
   }
 
   async multiPrompt(title, inputs, help) {
-    const values = await dialogs.multiPrompt(title, inputs, help);
+    const values = await multiPrompt(title, inputs, help);
     return values;
   }
 
